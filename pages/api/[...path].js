@@ -1,4 +1,4 @@
-import { backendConfigured, googleHomeConfigured, getBackend, maintainBackend } from '../../lib/server/backend.js';
+import { backendConfigured, googleHomeConfigured, calibrationWriteConfigured, getBackend, maintainBackend } from '../../lib/server/backend.js';
 import { equal } from '../../lib/server/domain.js';
 
 export const config = { api: { bodyParser: false, externalResolver: true }, maxDuration: 60 };
@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   const path = new URL(req.url, 'http://localhost').pathname;
   if (path === '/api/health' && req.method === 'GET') {
-    return res.status(200).json({ service: 'terrace-tank', status: 'ok', framework: 'nextjs', dashboardAccess: 'public', liveBackendConfigured: backendConfigured(), googleHomeConfigured: googleHomeConfigured() });
+    return res.status(200).json({ service: 'terrace-tank', status: 'ok', framework: 'nextjs', dashboardAccess: 'public', liveBackendConfigured: backendConfigured(), calibrationWriteConfigured: calibrationWriteConfigured(), googleHomeConfigured: googleHomeConfigured() });
   }
   if (path === '/api/maintenance') {
     if (!['GET','POST'].includes(req.method)) return res.status(405).json({ error: 'method_not_allowed' });

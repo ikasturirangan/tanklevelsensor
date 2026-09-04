@@ -11,17 +11,26 @@ try {
   assert.equal(response.status(), 200);
   await page.getByRole('heading', { name: 'Terrace Tank.' }).waitFor();
   await page.getByText('Waiting for the first connection.', { exact: true }).waitFor();
-  assert.equal(await page.locator('input[type=email], input[type=password], .signin-form, .mode-control, .demo-controls, input[type=range]').count(), 0);
+  assert.equal(await page.locator('input[type=email], .signin-form, .mode-control, .demo-controls, input[type=range]').count(), 0);
   assert.equal(await page.getByRole('button', { name: /demo|empty tank|full tank/i }).count(), 0);
   assert.doesNotMatch(await page.locator('body').innerText(), /\bdemo\b/i);
   assert.match(await page.locator('.percentage').innerText(), /—/);
+  await page.getByRole('heading', { name: 'Water use & history' }).waitFor();
+  assert.equal(await page.getByText('Tank dimensions & calibration', { exact: false }).count(), 1);
   await page.screenshot({ path: '/private/tmp/terrace-tank-next-desktop.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
   await page.screenshot({ path: '/private/tmp/terrace-tank-next-mobile.png', fullPage: true });
+  await page.getByText('Tank dimensions & calibration', { exact: false }).click();
+  await page.getByLabel('Sensor to inside bottom (cm)').fill('168');
+  await page.getByLabel('Sensor to full water level (cm)').fill('10');
+  await page.getByLabel('I have checked the measured distances and selected a suitable volume model.').check();
+  assert.equal((await page.locator('.capacity-preview strong').innerText()).replace(/\s/g, ''), '1,000L');
+  assert.equal(await page.getByRole('button', { name: 'Save calibration' }).isDisabled(), true, 'owner key is required to save');
 
   // Controlled API responses exercise real-reading rendering; no demo UI is shipped.
-  let publicReading = { id: 'terrace-tank', name: 'Terrace Tank', room: 'Attic', connected: true, source: 'sensor', reason: 'ok', distanceMm: 1500, levelPercent: 0, lastSeen: new Date().toISOString() };
+  const calibration = { shape: 'capacity_estimate', capacityLitres: 1000, emptyMm: 1500, fullMm: 200, noiseMm: 10, confirmed: true, revision: 'test' };
+  let publicReading = { id: 'terrace-tank', name: 'Terrace Tank', room: 'Attic', connected: true, source: 'sensor', reason: 'ok', distanceMm: 1500, levelPercent: 0, volumeLitres: 0, capacityLitres: 1000, calibration, lastSeen: new Date().toISOString() };
   await page.route('**/api/v1/tank', async route => {
     assert.equal(route.request().headers().authorization, undefined);
     await route.fulfill({ json: { tank: publicReading } });
@@ -29,22 +38,35 @@ try {
   await page.getByRole('button', { name: 'Refresh reading' }).click();
   await page.waitForFunction(() => document.querySelector('.percentage').textContent === '0%');
   assert.match(await page.locator('.monitor-footer').innerText(), /Public readings/);
-  publicReading = { ...publicReading, distanceMm: 200, levelPercent: 100 };
+  publicReading = { ...publicReading, distanceMm: 200, levelPercent: 100, volumeLitres: 1000 };
   await page.getByRole('button', { name: 'Refresh reading' }).click();
   await page.waitForFunction(() => document.querySelector('.percentage').textContent === '100%');
-  publicReading = { ...publicReading, distanceMm: null, levelPercent: null, reason: 'sensor_unavailable' };
+  publicReading = { ...publicReading, distanceMm: null, levelPercent: null, volumeLitres: null, reason: 'sensor_unavailable' };
   await page.getByRole('button', { name: 'Refresh reading' }).click();
   await page.waitForFunction(() => document.querySelector('.status').textContent === 'Sensor unavailable');
   assert.match(await page.locator('.percentage').innerText(), /—/);
-  publicReading = { ...publicReading, distanceMm: 200, levelPercent: 100, reason: 'ok', lastSeen: new Date(Date.now() - 180001).toISOString() };
+  publicReading = { ...publicReading, distanceMm: 200, levelPercent: 100, volumeLitres: 1000, reason: 'ok', lastSeen: new Date(Date.now() - 180001).toISOString() };
   await page.getByRole('button', { name: 'Refresh reading' }).click();
   await page.waitForFunction(() => document.querySelector('.status').textContent === 'Device offline');
   assert.match(await page.locator('.percentage').innerText(), /—/);
+  const generatedAtMs = Date.now();
+  const days = Array.from({ length: 7 }, (_, index) => ({ day: `2026-09-${String(index + 1).padStart(2, '0')}`, usedLitres: index === 6 ? 125 : null, addedLitres: index === 6 ? 500 : null, coverageSeconds: index === 6 ? 3600 : 0, gaps: 0 }));
+  const hours = Array.from({ length: 24 }, (_, hour) => ({ hour, usedLitres: hour === 20 ? 125 : null, observedDays: hour === 20 ? 1 : 0 }));
+  const history = { generatedAtMs, timeZone: 'Asia/Kolkata', days, hours, points: [{ atMs: generatedAtMs - 3600000, litres: 500, revision: 'test' }, { atMs: generatedAtMs, litres: 375, revision: 'test' }] };
+  await page.route('**/api/v1/tank/history', route => route.fulfill({ json: history }));
+  publicReading = { ...publicReading, connected: true, distanceMm: 1012, levelPercent: 37.5, volumeLitres: 375, lastSeen: new Date().toISOString() };
+  await page.reload({ waitUntil: 'networkidle' });
+  assert.equal((await page.locator('.volume-estimate strong').innerText()).replace(/\s/g, ''), '375L');
+  assert.equal((await page.locator('.usage-facts strong').first().innerText()).replace(/\s/g, ''), '125L');
+  assert.match(await page.locator('.usage-facts').innerText(), /20:00–21:00/);
+  assert.equal(await page.locator('.volume-chart').count(), 1);
+  assert.equal(await page.locator('input[type=email], .signin-form, .mode-control, .demo-controls, input[type=range]').count(), 0);
+  await page.unroute('**/api/v1/tank/history');
   await page.unroute('**/api/v1/tank');
   assert.equal((await page.request.get(`${base}/api/v1/tank`)).status(), 503);
   const health = await page.request.get(`${base}/api/health`);
   assert.equal(health.status(), 200); assert.equal((await health.json()).framework, 'nextjs');
   assert.equal((await page.request.get(`${base}/api/maintenance`)).status(), 401);
   assert.deepEqual(errors, []);
-  console.log(`PASS ${base}: public dashboard without demo or sign-in, anonymous zero/full/missing/stale readings, phone layout, API health and protected maintenance.`);
+  console.log(`PASS ${base}: public dashboard without demo or sign-in, litres, calibration, history, anonymous zero/full/missing/stale readings, phone layout and protected maintenance.`);
 } finally { await browser.close(); }

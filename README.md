@@ -19,7 +19,11 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). A local development server was started during setup. If it is still running, use that server rather than starting another on port 3000.
 
-The dashboard includes a filled-tank indicator, percentage, surface distance, connection status and last-update age. The default Live view refreshes public readings every 30 seconds without sign-in. It shows a waiting message until the backend and tank are connected. Live measurements become unknown after 3 minutes without a new upload.
+The dashboard includes percentage, estimated litres, surface distance, connection status, last-update age, a 24-hour volume graph and seven days of observed water-use/refill totals. It refreshes the latest public reading every 30 seconds and history every 5 minutes without sign-in. Live measurements become unknown after 3 minutes without a new upload.
+
+Open **Tank dimensions & calibration** on the public page to calculate volume from measurements. Saving is an owner operation protected by `TANK_ADMIN_KEY`; ordinary visitors do not sign in. Supported models are an upright round cylinder, a rectangular tank, or a linear estimate based on usable capacity. The 1,000 L model is preselected, but saving remains disabled until measured sensor-to-bottom and sensor-to-full-water distances are entered and checked.
+
+The calculation uses water depth `empty distance − current distance`. For straight-sided tanks, litres come from internal cross-sectional area × depth. The capacity model scales usable capacity by the measured depth fraction; it is approximate for tapered or domed tanks. Capacity must describe the water held at the selected full reference, which may be below the advertised tank capacity.
 
 ## Tests
 
@@ -36,7 +40,7 @@ For browser interaction checks, with the dev server running and Google Chrome in
 node scripts/check-ui.mjs
 ```
 
-Validated on 4 September 2026: production build successful; **12 backend tests passed, none failed or skipped**; browser checks passed for anonymous Live viewing, empty/full/missing/stale readings, absence of demo controls, phone width, health API, and protected maintenance. Browser tests use local controlled readings; backend tests use the Firestore emulator. Live cloud IAM, Firebase login, Google Home UI/Report State, actual free-hosting CPU/resource usage and ESP32 TLS uploads still require deployment testing.
+Validated on 5 September 2026: production build successful; **22 backend and calculation tests passed, none failed or skipped**. Browser checks cover anonymous viewing, litres, calibration, history, empty/full/missing/stale readings, phone width, health API and protected maintenance. Browser tests use controlled readings; backend tests use the local Firestore emulator. Live cloud IAM, Firebase login, Google Home UI/Report State, actual free-hosting CPU/resource usage and ESP32 TLS uploads still require deployment testing.
 
 ## How requests flow
 
@@ -77,6 +81,7 @@ Use project **homeintegrations-43740** and remain on **Spark**.
 4. Apply `firestore.rules` to that database. The file denies direct reads/writes; the Next.js Admin SDK accesses it through authenticated server routes. This project had no Firestore database when last inspected. If you add unrelated data/apps before setup, merge their rules instead of overwriting them.
 5. Create a dedicated service account for this app, with database read/write permission (`roles/datastore.user`) and Firebase Auth user-read permission (`roles/firebaseauth.viewer`). For Google Home reporting, enable HomeGraph API in the same project and follow [Google's service-account instructions](https://developers.home.google.com/cloud-to-cloud/integration/report-state). Save its JSON key privately. Place the complete JSON in the server-only environment variable `FIREBASE_SERVICE_ACCOUNT_JSON`.
 6. Generate random secrets of at least 32 characters for `TANK_OAUTH_CLIENT_SECRET` and `CRON_SECRET`. `TANK_OAUTH_CLIENT_ID` can stay `terrace-tank-google-home`. Keep private values out of Git, browser code and chat. A `.env.local` value holding JSON can be single-quoted on one line; in Vercel's environment editor paste the JSON value itself without shell quotes.
+7. Generate a separate random `TANK_ADMIN_KEY` of at least 32 characters. Enter this key only when saving tank dimensions. It is not needed to view the public dashboard.
 
 The Firebase API key identifies the Web app used for Google account linking; it is not the device upload credential. The public dashboard does not load Firebase Auth. The service-account project must match `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, and its private JSON must remain server-only.
 
@@ -122,6 +127,12 @@ Content-Type: application/json
 ```
 
 Send null if the sensor has no fresh reading. Otherwise send a filtered integer distance from 30–4500 mm. Use a random boot ID, increment sequence for each new upload, and reuse the exact body for retries. Upload about once/minute; new uploads within 10 seconds receive 429. An accepted reading returns 202; an identical retry returns 200 without making its timestamp fresh. The server derives the percentage from stored calibration.
+
+Each accepted upload also updates one daily history document. Duplicate retries do not add history. Falling calibrated levels count as observed use; rising levels count as water added. Changes smaller than the calibration noise allowance accumulate until significant, while missing readings, simulated data, gaps of three minutes or more and calibration changes start a new baseline. The dashboard shows 24 hours of downsampled volume and seven daily totals in `Asia/Kolkata`. Maintenance removes history older than 90 days.
+
+The node can retrieve its current confirmed calibration with an authenticated `GET /api/v1/devices/terrace-tank/calibration` using the device upload token. The currently flashed firmware does not call this endpoint yet; it still needs the planned HTTPS reporting update. Keeping litre calculations on the backend means tank dimensions can be corrected without reflashing after cloud reporting is installed.
+
+Consumption is estimated from net level changes. It includes any drawdown from taps, leakage or evaporation, and it cannot distinguish water being used while the tank is filling. A flow meter is required when those quantities must be separated.
 
 The ESP32's current flashed firmware still supplies Apple Home through Matter. It needs an HTTPS upload task added, compiled and tested before it can populate this app. Keep certificate/hostname validation enabled, synchronize the clock, and bound network timeouts. No firmware or Apple pairing was changed while building this app.
 

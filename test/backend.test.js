@@ -9,7 +9,7 @@ import { hash, secret, googleState, reading, STALE_MS, CODE_MS, ACCESS_MS, REFRE
 
 const emulator = process.env.FIRESTORE_EMULATOR_HOST;
 const projectId = 'demo-terrace-tank';
-const config = { projectId, clientId: 'test-client', clientSecret: secret(), webApiKey: 'test-public-key' };
+const config = { projectId, clientId: 'test-client', clientSecret: secret(), webApiKey: 'test-public-key', adminKey: secret() };
 const redirect = `https://oauth-redirect.googleusercontent.com/r/${projectId}`;
 const authorization = { client_id: config.clientId, redirect_uri: redirect, response_type: 'code', state: 'state-with-&?=symbols', scope: 'devices' };
 let admin, db, app, clock, credential;
@@ -104,7 +104,7 @@ integration('public dashboard exposes only Terrace Tank readings and never grant
   assert.equal(result.headers['cache-control'], 'no-store');
   assert.equal(result.body.tank.id, 'terrace-tank');
   assert.equal(result.body.tank.levelPercent, 50);
-  assert.deepEqual(Object.keys(result.body.tank).sort(), ['connected', 'distanceMm', 'id', 'lastSeen', 'levelPercent', 'name', 'reason', 'room', 'source'].sort());
+  assert.deepEqual(Object.keys(result.body.tank).sort(), ['connected', 'distanceMm', 'id', 'lastSeen', 'levelPercent', 'name', 'reason', 'room', 'source', 'volumeLitres', 'capacityLitres', 'calibration'].sort());
   await request(app).get('/v1/tank/private-tank').expect(404);
   await request(app).get('/v1/devices').expect(401);
   await request(app).post('/v1/tank').send({ levelPercent: 100 }).expect(404);
@@ -212,4 +212,53 @@ integration('Firestore rules block unauthenticated direct reads and writes', asy
   const url = `http://${emulator}/v1/projects/${projectId}/databases/(default)/documents/devices/terrace-tank`;
   assert.equal((await fetch(url)).status, 403);
   assert.equal((await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: { enabled: { booleanValue: false } } }) })).status, 403);
+});
+
+const dimensions = { shape: 'capacity_estimate', capacityLitres: 1000, emptyMm: 1500, fullMm: 200, noiseMm: 10, confirmed: true };
+const calibrate = (body = dimensions, key = config.adminKey) => request(app).put('/v1/tank/calibration').auth(key, { type: 'bearer' }).send(body);
+integration('only the owner can save dimensions; public viewers and upload credentials cannot', async () => {
+  await request(app).put('/v1/tank/calibration').send(dimensions).expect(401);
+  await calibrate(dimensions, credential).expect(401);
+  await calibrate({ ...dimensions, fullMm: 1501 }).expect(400);
+  const saved = await calibrate().expect(200);
+  assert.ok(saved.body.calibration.revision);
+  await upload(snapshot()).expect(202);
+  const read = await request(app).get('/v1/tank').expect(200);
+  assert.equal(read.body.tank.volumeLitres, 500);
+  assert.equal(read.body.tank.capacityLitres, 1000);
+  assert.equal(JSON.stringify(read.body).includes(config.adminKey), false);
+  await request(app).get('/v1/devices/terrace-tank/calibration').expect(401);
+  const node = await request(app).get('/v1/devices/terrace-tank/calibration').auth(credential, { type: 'bearer' }).expect(200);
+  assert.equal(node.body.calibration.revision, saved.body.calibration.revision);
+});
+integration('history records each accepted upload once and separates refills from use', async () => {
+  await calibrate().expect(200);
+  await upload(snapshot(850)).expect(202);
+  clock += 60000;
+  const result = await upload(snapshot(980, 'sensor', 2)).expect(202);
+  assert.equal(result.body.volumeLitres, 400);
+  await upload(snapshot(980, 'sensor', 2)).expect(200);
+  clock += 60000;
+  await upload(snapshot(720, 'sensor', 3)).expect(202);
+  const history = await request(app).get('/v1/tank/history').expect(200);
+  const today = history.body.days.at(-1);
+  assert.equal(today.usedLitres, 100);
+  assert.equal(today.addedLitres, 200);
+  assert.equal(today.coverageSeconds, 120);
+  assert.equal(history.body.timeZone, 'Asia/Kolkata');
+  assert.equal(history.headers['cache-control'], 'public, max-age=0, s-maxage=300');
+  const days = await db.collection('devices').doc('terrace-tank').collection('days').get();
+  assert.equal(days.docs[0].data().samples, 3);
+  assert.equal(JSON.stringify(history.body).includes('ownerUid'), false);
+});
+integration('recalibration preserves totals and does not turn scale changes into water use', async () => {
+  await calibrate().expect(200);
+  await upload(snapshot(850)).expect(202);
+  clock += 60000; await upload(snapshot(980, 'sensor', 2)).expect(202);
+  await calibrate({ ...dimensions, capacityLitres: 2000 }).expect(200);
+  clock += 60000; await upload(snapshot(980, 'sensor', 3)).expect(202);
+  const history = await request(app).get('/v1/tank/history').expect(200);
+  assert.equal(history.body.days.at(-1).usedLitres, 100);
+  const latest = await request(app).get('/v1/tank').expect(200);
+  assert.equal(latest.body.tank.volumeLitres, 800);
 });

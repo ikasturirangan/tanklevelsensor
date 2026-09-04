@@ -8,8 +8,8 @@
     "failed": 0,
     "skipped": 0
   },
-  "browserChecks": "passed locally: public dashboard with litres, calibration, history, no demo controls and no sign-in",
-  "productionBuild": "passed locally; Vercel verification follows the connected main-branch deployment",
+  "browserChecks": "passed locally and on production: public dashboard with litres, calibration, history, no demo controls and no sign-in",
+  "productionBuild": "passed locally and on Vercel",
   "volumeCalibration": "implemented for upright round, rectangular and known-capacity models; owner-protected writes",
   "consumptionHistory": "implemented with 24-hour volume, seven-day use/refill totals, five-minute downsampling and 90-day retention",
   "liveBackendConfigured": false,

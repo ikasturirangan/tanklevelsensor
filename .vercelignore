@@ -1,0 +1,11 @@
+node_modules/
+.next/
+.git/
+.vercel/
+.firebase/
+.secrets/
+.env*
+*-debug.log
+*.credentials.json
+*.tsbuildinfo
+DEPLOYMENT-STATUS.json

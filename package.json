@@ -1,0 +1,33 @@
+{
+  "name": "terrace-tank-next",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start --port 3000",
+    "test": "node --test test/*.test.js",
+    "test:emulator": "firebase emulators:exec --project demo-terrace-tank --only firestore 'npm test'",
+    "provision": "node scripts/provision.js",
+    "simulate": "node scripts/simulate.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "firebase": "^12.0.0",
+    "firebase-admin": "^13.4.0",
+    "google-auth-library": "^10.0.0",
+    "lucide-react": "^0.468.0",
+    "next": "^16.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "firebase-tools": "^15.0.0",
+    "supertest": "^7.1.0"
+  }
+}

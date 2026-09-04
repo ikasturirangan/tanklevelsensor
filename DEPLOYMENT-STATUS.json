@@ -1,0 +1,24 @@
+{
+  "selectedImplementation": "Next.js app + API routes",
+  "hosting": "Vercel Hobby (deployed)",
+  "firebasePlan": "Spark; default Firestore and Authentication only",
+  "localPreview": "http://localhost:3000",
+  "backendTests": {
+    "passed": 12,
+    "failed": 0,
+    "skipped": 0
+  },
+  "browserChecks": "passed locally and on production: public dashboard with no demo controls or sign-in",
+  "productionBuild": "passed locally and on Vercel",
+  "liveBackendConfigured": false,
+  "firmwareChanged": false,
+  "nextStep": "Configure the Firebase Spark service-account setting, provision Terrace Tank and add ESP32 HTTPS uploads. Google Home owner linking remains separate from public dashboard viewing.",
+  "productionUrl": "https://terrace-tank.vercel.app",
+  "deploymentId": "dpl_2fHG947fApu6HbVebL5o9S27cG6k",
+  "dashboardAccess": "public; no sign-in",
+  "defaultView": "Live",
+  "googleHomeConfigured": false,
+  "verifiedAtUtc": "2026-09-04T15:56:03.888860+00:00",
+  "demoControls": false,
+  "githubStatus": "Local Git repository on main; destination repository URL pending."
+}

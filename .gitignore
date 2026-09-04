@@ -1,0 +1,12 @@
+node_modules/
+.next/
+.vercel/
+.firebase/
+.secrets/
+.env*
+!.env.example
+*-debug.log
+*.credentials.json
+*.tsbuildinfo
+.DS_Store
+*-firebase-adminsdk-*.json

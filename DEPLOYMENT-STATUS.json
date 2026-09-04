@@ -20,5 +20,7 @@
   "googleHomeConfigured": false,
   "verifiedAtUtc": "2026-09-04T15:56:03.888860+00:00",
   "demoControls": false,
-  "githubStatus": "Local Git repository on main; destination repository URL pending."
+  "githubStatus": "Pushed to main; repository connected to Vercel.",
+  "githubRepository": "https://github.com/ikasturirangan/tanklevelsensor",
+  "vercelGitConnected": true
 }

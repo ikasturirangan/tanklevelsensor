@@ -53,6 +53,8 @@ Readings are stored in Firestore, not a server variable or a local Vercel file. 
 
 ## Source code and GitHub
 
+Repository: **[ikasturirangan/tanklevelsensor](https://github.com/ikasturirangan/tanklevelsensor)**. The default branch is `main`, and the repository is connected to the existing Terrace Tank Vercel project.
+
 The Next.js app and backend are in this repository:
 
 - `components/tank-dashboard.jsx`: public tank dashboard.
@@ -63,7 +65,7 @@ The Next.js app and backend are in this repository:
 
 The ESP32 firmware is a separate Arduino project and is not part of this web-app repository. See the hardware project for flashing instructions.
 
-The local source folder is `/Users/ikasturirangan/Desktop/globeseeker/terrace-tank-next`. Git ignores `.env.local`, local credentials, dependencies, build output and Vercel account links. Add the intended GitHub repository as `origin`, then push `main`. Once the repository is connected to the existing Vercel project, pushes can deploy automatically.
+The local source folder is `/Users/ikasturirangan/Desktop/globeseeker/terrace-tank-next`. Git ignores `.env.local`, local credentials, dependencies, build output and Vercel account links. `origin` points to `https://github.com/ikasturirangan/tanklevelsensor.git`. Push changes with `git push origin main`; Vercel deploys updates from this repository.
 
 ## Free Firebase setup
 
